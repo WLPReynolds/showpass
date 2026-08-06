@@ -6,35 +6,42 @@
 <title>ShowPass</title>
 
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0b0f0e">
+<meta name="theme-color" content="#161d3a">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ShowPass">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#0b0f0e;
-    --panel:#111815;
-    --panel-raised:#161f1b;
-    --line: rgba(120,255,190,0.14);
-    --phosphor:#5CFFB0;
-    --phosphor-dim:#2b7a58;
-    --amber:#ffb648;
-    --danger:#ff5c5c;
-    --text:#d9f5e8;
-    --text-dim:#7fa898;
-    --mono: 'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
-    --disp: 'JetBrains Mono',ui-monospace,monospace;
+    --ink:#12172c;
+    --panel:#1a2140;
+    --panel-raised:#232b52;
+    --line: rgba(120,148,255,0.16);
+    --phosphor:#236cf4;
+    --phosphor-dim:#3d4a80;
+    --amber:#f79826;
+    --danger:#ff3366;
+    --cyan:#44c9f0;
+    --magenta:#b5179e;
+    --text:#eef1fb;
+    --text-dim:#8d96bf;
+    --brand: 'Sora', ui-sans-serif, system-ui, sans-serif;
+    --mono: 'IBM Plex Mono','JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --disp: 'IBM Plex Mono',ui-monospace,monospace;
+    --spectrum: linear-gradient(90deg, #ff3366, #f79826, #b5179e, #236cf4, #44c9f0);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
   body{
     margin:0;
     background:
-      radial-gradient(ellipse at 50% -10%, #17251f 0%, var(--ink) 55%);
+      radial-gradient(ellipse at 50% -10%, #263268 0%, var(--ink) 55%);
     color:var(--text);
-    font-family:var(--mono);
+    font-family:var(--brand);
     min-height:100vh;
     display:flex;
     align-items:flex-start;
@@ -54,10 +61,14 @@
   }
   .brand{
     font-size:13px;
-    letter-spacing:0.32em;
-    color:var(--phosphor);
+    letter-spacing:0.28em;
+    background:var(--spectrum);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
     text-transform:uppercase;
-    font-weight:600;
+    font-weight:800;
+    font-family:var(--brand);
   }
   .brand span{color:var(--text-dim); letter-spacing:0.15em; font-weight:400;}
   .clock{
@@ -79,7 +90,7 @@
     position:absolute; inset:0;
     border-radius:14px;
     padding:1px;
-    background:linear-gradient(160deg, rgba(92,255,176,0.18), transparent 40%);
+    background:linear-gradient(160deg, rgba(68,201,240,0.22), transparent 40%);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -100,9 +111,9 @@
   .status-dot{
     width:7px; height:7px; border-radius:50%;
     background:var(--phosphor-dim);
-    box-shadow:0 0 0 3px rgba(92,255,176,0.06);
+    box-shadow:0 0 0 3px rgba(35,108,244,0.08);
   }
-  .status-dot.live{ background:var(--phosphor); box-shadow:0 0 8px 1px var(--phosphor), 0 0 0 3px rgba(92,255,176,0.12);}
+  .status-dot.live{ background:var(--cyan); box-shadow:0 0 8px 1px var(--cyan), 0 0 0 3px rgba(68,201,240,0.14);}
   .status-dot.err{ background:var(--danger); box-shadow:0 0 8px 1px var(--danger);}
 
   /* Camera */
@@ -161,27 +172,30 @@
   }
 
   button{
-    font-family:var(--mono);
+    font-family:var(--brand);
     border-radius:8px;
     border:1px solid var(--line);
-    background:rgba(92,255,176,0.05);
+    background:rgba(68,201,240,0.06);
     color:var(--text);
     padding:11px 14px;
     font-size:12.5px;
-    letter-spacing:0.06em;
+    font-weight:600;
+    letter-spacing:0.04em;
     cursor:pointer;
     transition:all .15s ease;
     flex:1;
   }
-  button:hover{ background:rgba(92,255,176,0.1); border-color:rgba(92,255,176,0.4); }
+  button:hover{ background:rgba(68,201,240,0.12); border-color:rgba(68,201,240,0.4); }
   button:active{ transform:scale(0.98); }
   button.primary{
-    background:var(--phosphor);
-    color:#04120a;
-    border-color:var(--phosphor);
+    background:var(--spectrum);
+    background-size:220% 100%;
+    background-position:0% 0%;
+    color:#0d1130;
+    border-color:transparent;
     font-weight:700;
   }
-  button.primary:hover{ background:#7fffc2; }
+  button.primary:hover{ background-position:100% 0%; }
   button:disabled{ opacity:0.35; cursor:not-allowed; }
   button.ghost{ background:transparent; }
 
@@ -192,16 +206,16 @@
     font-family:var(--disp);
     font-size:26px;
     letter-spacing:0.14em;
-    background:#0a100d;
+    background:#0d1230;
     border:1px solid var(--line);
     border-radius:8px;
-    color:var(--phosphor);
+    color:var(--cyan);
     padding:12px 14px;
     text-align:center;
     outline:none;
-    caret-color:var(--phosphor);
+    caret-color:var(--cyan);
   }
-  input[type=tel]:focus{ border-color:var(--phosphor); box-shadow:0 0 0 3px rgba(92,255,176,0.1); }
+  input[type=tel]:focus{ border-color:var(--cyan); box-shadow:0 0 0 3px rgba(68,201,240,0.12); }
   input[type=tel]::placeholder{ color:var(--phosphor-dim); letter-spacing:0.14em; }
 
   /* Response display */
@@ -210,21 +224,29 @@
     padding:26px 20px 22px;
   }
   .response-value{
+    font-family:var(--disp);
     font-size:52px;
     font-weight:700;
     letter-spacing:0.06em;
-    color:var(--phosphor);
-    text-shadow:0 0 18px rgba(92,255,176,0.35);
+    background:var(--spectrum);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    filter: drop-shadow(0 0 22px rgba(68,201,240,0.25));
     line-height:1;
     min-height:60px;
     display:flex; align-items:center; justify-content:center;
     font-variant-numeric: tabular-nums;
   }
   .response-value.empty{
+    background:none;
+    -webkit-text-fill-color:initial;
     color:var(--phosphor-dim);
     font-size:15px;
+    font-family:var(--brand);
     letter-spacing:0.2em;
     text-shadow:none;
+    filter:none;
   }
   .response-sub{
     margin-top:10px;
@@ -239,7 +261,7 @@
 
   .toast{
     position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
-    background:#0e1613; border:1px solid var(--line);
+    background:#1a2145; border:1px solid var(--line);
     color:var(--text); font-size:12px; letter-spacing:0.05em;
     padding:10px 16px; border-radius:8px;
     opacity:0; transition:all .25s ease;
@@ -248,7 +270,7 @@
     text-align:center;
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
-  .toast.err{ border-color:rgba(255,92,92,0.4); color:#ffb0b0; }
+  .toast.err{ border-color:rgba(255,51,102,0.45); color:#ffb3c9; }
 
   .footer-note{
     text-align:center;
@@ -314,7 +336,7 @@
     <button class="primary" id="copyBtn" disabled>Copy Response</button>
   </div>
 
-  <div class="footer-note">RESPONSE = REQUEST XOR 26312 · ON-DEVICE ONLY</div>
+  <div class="footer-note">LANGDON · RESPONSE = REQUEST XOR 26312 · ON-DEVICE ONLY</div>
 </div>
 
 <div class="toast" id="toast"></div>
