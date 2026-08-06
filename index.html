@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ShowPass</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0f0e">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ShowPass">
+<style>
+  :root{
+    --ink:#0b0f0e;
+    --panel:#111815;
+    --panel-raised:#161f1b;
+    --line: rgba(120,255,190,0.14);
+    --phosphor:#5CFFB0;
+    --phosphor-dim:#2b7a58;
+    --amber:#ffb648;
+    --danger:#ff5c5c;
+    --text:#d9f5e8;
+    --text-dim:#7fa898;
+    --mono: 'JetBrains Mono','SF Mono',ui-monospace,Menlo,Consolas,monospace;
+    --disp: 'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse at 50% -10%, #17251f 0%, var(--ink) 55%);
+    color:var(--text);
+    font-family:var(--mono);
+    min-height:100vh;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:28px 16px 60px;
+  }
+  .device{
+    width:100%;
+    max-width:420px;
+  }
+  .brandrow{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:18px;
+    padding:0 2px;
+  }
+  .brand{
+    font-size:13px;
+    letter-spacing:0.32em;
+    color:var(--phosphor);
+    text-transform:uppercase;
+    font-weight:600;
+  }
+  .brand span{color:var(--text-dim); letter-spacing:0.15em; font-weight:400;}
+  .clock{
+    font-size:11px;
+    color:var(--text-dim);
+    letter-spacing:0.08em;
+  }
+  .panel{
+    background:linear-gradient(180deg, var(--panel-raised), var(--panel));
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px;
+    margin-bottom:14px;
+    position:relative;
+    box-shadow: 0 20px 40px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+  .panel::before{
+    content:'';
+    position:absolute; inset:0;
+    border-radius:14px;
+    padding:1px;
+    background:linear-gradient(160deg, rgba(92,255,176,0.18), transparent 40%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events:none;
+  }
+  .label-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:12px;
+  }
+  .label{
+    font-size:10.5px;
+    letter-spacing:0.24em;
+    color:var(--text-dim);
+    text-transform:uppercase;
+  }
+  .status-dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--phosphor-dim);
+    box-shadow:0 0 0 3px rgba(92,255,176,0.06);
+  }
+  .status-dot.live{ background:var(--phosphor); box-shadow:0 0 8px 1px var(--phosphor), 0 0 0 3px rgba(92,255,176,0.12);}
+  .status-dot.err{ background:var(--danger); box-shadow:0 0 8px 1px var(--danger);}
+
+  /* Camera */
+  .camwrap{
+    position:relative;
+    border-radius:10px;
+    overflow:hidden;
+    background:#000;
+    aspect-ratio: 4/3;
+    border:1px solid var(--line);
+  }
+  video, canvas.overlay{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;
+  }
+  canvas.overlay{ pointer-events:none; }
+  .scan-frame{
+    position:absolute;
+    left:8%; right:8%; top:36%; bottom:36%;
+    border:1.5px solid var(--phosphor);
+    border-radius:6px;
+    opacity:0.85;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.35);
+  }
+  .scan-frame::before, .scan-frame::after{
+    content:'';
+    position:absolute; width:16px; height:16px;
+    border-color:var(--amber);
+  }
+  .scanline{
+    position:absolute; left:8%; right:8%; top:36%;
+    height:2px;
+    background:linear-gradient(90deg, transparent, var(--phosphor), transparent);
+    animation: sweep 1.8s ease-in-out infinite;
+    opacity:0;
+  }
+  .scanline.on{ opacity:0.9; }
+  @keyframes sweep{
+    0%{ top:36%; }
+    50%{ top:64%; }
+    100%{ top:36%; }
+  }
+  .camplaceholder{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px;
+    color:var(--text-dim);
+    font-size:11px;
+    letter-spacing:0.1em;
+    text-align:center;
+    padding:20px;
+  }
+  .cam-controls{
+    display:flex; gap:8px; margin-top:12px;
+  }
+
+  button{
+    font-family:var(--mono);
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:rgba(92,255,176,0.05);
+    color:var(--text);
+    padding:11px 14px;
+    font-size:12.5px;
+    letter-spacing:0.06em;
+    cursor:pointer;
+    transition:all .15s ease;
+    flex:1;
+  }
+  button:hover{ background:rgba(92,255,176,0.1); border-color:rgba(92,255,176,0.4); }
+  button:active{ transform:scale(0.98); }
+  button.primary{
+    background:var(--phosphor);
+    color:#04120a;
+    border-color:var(--phosphor);
+    font-weight:700;
+  }
+  button.primary:hover{ background:#7fffc2; }
+  button:disabled{ opacity:0.35; cursor:not-allowed; }
+  button.ghost{ background:transparent; }
+
+  /* Manual entry */
+  .code-input-row{ display:flex; gap:10px; align-items:center; }
+  input[type=tel]{
+    flex:1;
+    font-family:var(--disp);
+    font-size:26px;
+    letter-spacing:0.14em;
+    background:#0a100d;
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--phosphor);
+    padding:12px 14px;
+    text-align:center;
+    outline:none;
+    caret-color:var(--phosphor);
+  }
+  input[type=tel]:focus{ border-color:var(--phosphor); box-shadow:0 0 0 3px rgba(92,255,176,0.1); }
+  input[type=tel]::placeholder{ color:var(--phosphor-dim); letter-spacing:0.14em; }
+
+  /* Response display */
+  .response-panel{
+    text-align:center;
+    padding:26px 20px 22px;
+  }
+  .response-value{
+    font-size:52px;
+    font-weight:700;
+    letter-spacing:0.06em;
+    color:var(--phosphor);
+    text-shadow:0 0 18px rgba(92,255,176,0.35);
+    line-height:1;
+    min-height:60px;
+    display:flex; align-items:center; justify-content:center;
+    font-variant-numeric: tabular-nums;
+  }
+  .response-value.empty{
+    color:var(--phosphor-dim);
+    font-size:15px;
+    letter-spacing:0.2em;
+    text-shadow:none;
+  }
+  .response-sub{
+    margin-top:10px;
+    font-size:10.5px;
+    letter-spacing:0.14em;
+    color:var(--text-dim);
+  }
+  .response-sub b{ color:var(--text); font-weight:600;}
+
+  .row2{ display:flex; gap:10px; }
+  .row2 button{ flex:1; }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
+    background:#0e1613; border:1px solid var(--line);
+    color:var(--text); font-size:12px; letter-spacing:0.05em;
+    padding:10px 16px; border-radius:8px;
+    opacity:0; transition:all .25s ease;
+    pointer-events:none;
+    max-width:88vw;
+    text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast.err{ border-color:rgba(255,92,92,0.4); color:#ffb0b0; }
+
+  .footer-note{
+    text-align:center;
+    font-size:9.5px;
+    color:var(--phosphor-dim);
+    letter-spacing:0.12em;
+    margin-top:18px;
+  }
+</style>
+</head>
+<body>
+
+<div class="device">
+  <div class="brandrow">
+    <div class="brand">SHOW<span>PASS</span></div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+
+  <button id="installBtn" class="ghost" style="display:none; width:100%; margin-bottom:14px; font-size:11px; letter-spacing:0.12em;">
+    ↓ INSTALL SHOWPASS
+  </button>
+
+  <!-- Camera panel -->
+  <div class="panel">
+    <div class="label-row">
+      <div class="label">Optical Capture</div>
+      <div class="status-dot" id="camDot"></div>
+    </div>
+    <div class="camwrap" id="camwrap">
+      <div class="camplaceholder" id="camPlaceholder">
+        CAMERA IDLE<br>Tap "Start Camera" to scan a request code
+      </div>
+      <video id="video" autoplay playsinline muted style="display:none;"></video>
+      <div class="scan-frame" id="scanFrame" style="display:none;"></div>
+      <div class="scanline" id="scanline"></div>
+    </div>
+    <div class="cam-controls">
+      <button id="startCamBtn">Start Camera</button>
+      <button id="captureBtn" class="primary" disabled>Scan Code</button>
+    </div>
+  </div>
+
+  <!-- Manual entry -->
+  <div class="panel">
+    <div class="label-row">
+      <div class="label">Request Code</div>
+      <div class="label" id="ocrTag" style="color:var(--phosphor); opacity:0;">OCR</div>
+    </div>
+    <div class="code-input-row">
+      <input type="tel" id="codeInput" placeholder="00000" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+    </div>
+  </div>
+
+  <!-- Response -->
+  <div class="panel response-panel">
+    <div class="label" style="margin-bottom:2px;">Response Code</div>
+    <div class="response-value empty" id="responseValue">AWAITING INPUT</div>
+    <div class="response-sub" id="responseSub">&nbsp;</div>
+  </div>
+
+  <div class="row2">
+    <button class="ghost" id="clearBtn">Clear</button>
+    <button class="primary" id="copyBtn" disabled>Copy Response</button>
+  </div>
+
+  <div class="footer-note">RESPONSE = REQUEST XOR 26312 · ON-DEVICE ONLY</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script>
+const XOR_KEY = 26312;
+
+const codeInput = document.getElementById('codeInput');
+const responseValue = document.getElementById('responseValue');
+const responseSub = document.getElementById('responseSub');
+const copyBtn = document.getElementById('copyBtn');
+const clearBtn = document.getElementById('clearBtn');
+const startCamBtn = document.getElementById('startCamBtn');
+const captureBtn = document.getElementById('captureBtn');
+const video = document.getElementById('video');
+const camPlaceholder = document.getElementById('camPlaceholder');
+const scanFrame = document.getElementById('scanFrame');
+const scanline = document.getElementById('scanline');
+const camDot = document.getElementById('camDot');
+const ocrTag = document.getElementById('ocrTag');
+const toast = document.getElementById('toast');
+
+let stream = null;
+let ocrWorker = null;
+let ocrReady = false;
+
+// Clock
+function tickClock(){
+  const d = new Date();
+  document.getElementById('clock').textContent = d.toTimeString().slice(0,8);
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+function showToast(msg, isErr=false){
+  toast.textContent = msg;
+  toast.classList.toggle('err', isErr);
+  toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> toast.classList.remove('show'), 2600);
+}
+
+function computeResponse(){
+  const raw = codeInput.value.replace(/\D/g,'');
+  if(!raw){
+    responseValue.textContent = 'AWAITING INPUT';
+    responseValue.classList.add('empty');
+    responseSub.innerHTML = '&nbsp;';
+    copyBtn.disabled = true;
+    return;
+  }
+  const n = parseInt(raw, 10);
+  const result = (n ^ XOR_KEY) >>> 0;
+  responseValue.textContent = String(result).padStart(5,'0');
+  responseValue.classList.remove('empty');
+  responseSub.innerHTML = `REQUEST <b>${raw.padStart(5,'0')}</b> · KEY <b>${XOR_KEY}</b>`;
+  copyBtn.disabled = false;
+}
+
+codeInput.addEventListener('input', ()=>{
+  codeInput.value = codeInput.value.replace(/\D/g,'').slice(0,6);
+  ocrTag.style.opacity = 0;
+  computeResponse();
+});
+
+clearBtn.addEventListener('click', ()=>{
+  codeInput.value = '';
+  computeResponse();
+  codeInput.focus();
+});
+
+copyBtn.addEventListener('click', async ()=>{
+  const val = responseValue.textContent;
+  try{
+    await navigator.clipboard.writeText(val);
+    showToast('Response copied: ' + val);
+  }catch(e){
+    showToast('Copy failed — select manually', true);
+  }
+});
+
+// Camera
+startCamBtn.addEventListener('click', async ()=>{
+  if(stream){
+    stopCamera();
+    return;
+  }
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:960} },
+      audio:false
+    });
+    video.srcObject = stream;
+    video.style.display = 'block';
+    camPlaceholder.style.display = 'none';
+    scanFrame.style.display = 'block';
+    scanline.classList.add('on');
+    camDot.classList.add('live');
+    startCamBtn.textContent = 'Stop Camera';
+    captureBtn.disabled = false;
+    initOCR();
+  }catch(err){
+    camDot.classList.add('err');
+    showToast('Camera access denied or unavailable', true);
+  }
+});
+
+function stopCamera(){
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());
+    stream = null;
+  }
+  video.style.display = 'none';
+  camPlaceholder.style.display = 'flex';
+  scanFrame.style.display = 'none';
+  scanline.classList.remove('on');
+  camDot.classList.remove('live');
+  startCamBtn.textContent = 'Start Camera';
+  captureBtn.disabled = true;
+}
+
+async function initOCR(){
+  if(ocrWorker) return;
+  try{
+    ocrWorker = await Tesseract.createWorker('eng', 1, {
+      logger: ()=>{}
+    });
+    await ocrWorker.setParameters({
+      tessedit_char_whitelist: '0123456789',
+      tessedit_pageseg_mode: '7' // treat as single line of text
+    });
+    ocrReady = true;
+  }catch(e){
+    showToast('OCR engine failed to load', true);
+  }
+}
+
+captureBtn.addEventListener('click', async ()=>{
+  if(!stream) return;
+  captureBtn.disabled = true;
+  captureBtn.textContent = 'Reading…';
+
+  try{
+    // Crop to the scan-frame region for better accuracy
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const cropX = vw * 0.08, cropY = vh * 0.36;
+    const cropW = vw * 0.84, cropH = vh * 0.28;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cropW;
+    canvas.height = cropH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    // Preprocess: grayscale + contrast threshold
+    const imgData = ctx.getImageData(0,0,canvas.width, canvas.height);
+    const d = imgData.data;
+    for(let i=0;i<d.length;i+=4){
+      const gray = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      const v = gray > 130 ? 255 : 0; // simple threshold, tweakable
+      d[i]=d[i+1]=d[i+2]=v;
+    }
+    ctx.putImageData(imgData,0,0);
+
+    if(!ocrReady){
+      await initOCR();
+    }
+    const { data:{ text } } = await ocrWorker.recognize(canvas);
+    const digits = (text.match(/\d+/g) || []).join('');
+
+    if(digits && digits.length >= 3){
+      codeInput.value = digits.slice(0,6);
+      ocrTag.style.opacity = 1;
+      computeResponse();
+      showToast('Captured: ' + digits);
+    } else {
+      showToast('No clear digits found — try again or type manually', true);
+    }
+  }catch(e){
+    showToast('Scan failed', true);
+  }finally{
+    captureBtn.disabled = false;
+    captureBtn.textContent = 'Scan Code';
+  }
+});
+
+// Install prompt (Android/Chrome)
+let deferredInstallPrompt = null;
+const installBtn = document.getElementById('installBtn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installBtn.style.display = 'block';
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  if (outcome === 'accepted') {
+    installBtn.style.display = 'none';
+  }
+  deferredInstallPrompt = null;
+});
+
+window.addEventListener('appinstalled', () => {
+  installBtn.style.display = 'none';
+  showToast('ShowPass installed');
+});
+
+// init
+computeResponse();
+
+// Register service worker for offline/installable support
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // Non-fatal — app still works without offline support
+    });
+  });
+}
+</script>
+</body>
+</html>
