@@ -706,7 +706,7 @@ captureBtn.addEventListener('click', async ()=>{
       computeResponse();
       showToast('Captured: ' + digits);
     } else {
-      showToast('No clear digits found — try again or type manually', true);
+      showToast('No printed digits found — for a barcode, just hold it in frame (no button needed)', true);
     }
   }catch(e){
     showToast('Scan failed', true);
