@@ -144,6 +144,11 @@
     position:absolute; width:16px; height:16px;
     border-color:var(--amber);
   }
+  .scan-frame.hit{
+    border-color:var(--cyan);
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.35), 0 0 22px 3px rgba(68,201,240,0.55);
+    transition: box-shadow .15s ease, border-color .15s ease;
+  }
   .scanline{
     position:absolute; left:8%; right:8%; top:36%;
     height:2px;
@@ -256,6 +261,26 @@
   }
   .response-sub b{ color:var(--text); font-weight:600;}
 
+  .mrn-value{
+    font-family:var(--disp);
+    font-size:21px;
+    font-weight:700;
+    letter-spacing:0.03em;
+    text-align:center;
+    background:var(--spectrum);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    padding:12px 6px 4px;
+    word-break:break-all;
+    filter: drop-shadow(0 0 14px rgba(68,201,240,0.2));
+  }
+  #barcodeSupportTag{
+    font-size:9px;
+    color:var(--text-dim);
+    letter-spacing:0.14em;
+  }
+
   .row2{ display:flex; gap:10px; }
   .row2 button{ flex:1; }
 
@@ -279,6 +304,39 @@
     letter-spacing:0.12em;
     margin-top:18px;
   }
+
+  .ios-steps{
+    margin:8px 0 2px;
+    padding-left:0;
+    list-style:none;
+  }
+  .ios-steps li{
+    display:flex;
+    gap:11px;
+    align-items:flex-start;
+    margin-bottom:11px;
+    font-size:12.5px;
+    line-height:1.5;
+    color:var(--text);
+  }
+  .ios-steps li b{ color:var(--cyan); font-weight:700; }
+  .ios-steps .num{
+    flex:0 0 20px;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:var(--spectrum);
+    color:#0d1130;
+    font-weight:800;
+    font-size:11px;
+    display:flex; align-items:center; justify-content:center;
+    margin-top:1px;
+  }
+  #iosInstallHint p{
+    margin:6px 0 12px;
+    font-size:12px;
+    color:var(--text-dim);
+    line-height:1.5;
+  }
 </style>
 </head>
 <body>
@@ -293,15 +351,26 @@
     ↓ INSTALL SHOWPASS
   </button>
 
+  <!-- iOS install guidance — Safari has no install prompt, so this is shown
+       explicitly rather than relying on users to discover it themselves -->
+  <div class="panel" id="iosInstallHint" style="display:none;">
+    <div class="label-row">
+      <div class="label">Install ShowPass</div>
+      <button id="iosHintDismiss" class="ghost" style="flex:0; padding:5px 10px; font-size:13px;">✕</button>
+    </div>
+    <div id="iosHintBody"></div>
+  </div>
+
   <!-- Camera panel -->
   <div class="panel">
     <div class="label-row">
       <div class="label">Optical Capture</div>
+      <div class="label" id="barcodeSupportTag" style="opacity:0.6;">&nbsp;</div>
       <div class="status-dot" id="camDot"></div>
     </div>
     <div class="camwrap" id="camwrap">
       <div class="camplaceholder" id="camPlaceholder">
-        CAMERA IDLE<br>Tap "Start Camera" to scan a request code
+        CAMERA IDLE<br>Barcodes auto-detect · tap "Scan Code" for printed digits
       </div>
       <video id="video" autoplay playsinline muted style="display:none;"></video>
       <div class="scan-frame" id="scanFrame" style="display:none;"></div>
@@ -310,6 +379,20 @@
     <div class="cam-controls">
       <button id="startCamBtn">Start Camera</button>
       <button id="captureBtn" class="primary" disabled>Scan Code</button>
+    </div>
+  </div>
+
+  <!-- MRN result (shown when a barcode is captured) -->
+  <div class="panel" id="mrnPanel" style="display:none;">
+    <div class="label-row">
+      <div class="label">MRN Captured</div>
+      <div class="label" id="mrnFormatBadge">BARCODE</div>
+    </div>
+    <div class="mrn-value" id="mrnValue">—</div>
+    <div class="response-sub" id="mrnValidity">&nbsp;</div>
+    <div class="row2" style="margin-top:12px;">
+      <button class="ghost" id="mrnDismissBtn">Dismiss</button>
+      <button class="primary" id="mrnCopyBtn">Copy MRN</button>
     </div>
   </div>
 
@@ -342,6 +425,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
 const XOR_KEY = 26312;
 
@@ -359,10 +443,56 @@ const scanline = document.getElementById('scanline');
 const camDot = document.getElementById('camDot');
 const ocrTag = document.getElementById('ocrTag');
 const toast = document.getElementById('toast');
+const barcodeSupportTag = document.getElementById('barcodeSupportTag');
+const mrnPanel = document.getElementById('mrnPanel');
+const mrnValue = document.getElementById('mrnValue');
+const mrnValidity = document.getElementById('mrnValidity');
+const mrnFormatBadge = document.getElementById('mrnFormatBadge');
+const mrnCopyBtn = document.getElementById('mrnCopyBtn');
+const mrnDismissBtn = document.getElementById('mrnDismissBtn');
 
 let stream = null;
 let ocrWorker = null;
 let ocrReady = false;
+
+// UK/EU customs MRN: 2-digit year + 2-letter country + 14 alphanumeric (incl. check digit)
+const MRN_PATTERN = /^\d{2}[A-Z]{2}[A-Z0-9]{14}$/;
+
+// ZXing barcode reading — pure JS, works on Safari/iOS as well as Chrome/Android,
+// unlike the native BarcodeDetector API which Safari doesn't implement.
+let zxingReader = null;
+let zxingScanning = false;
+let barcodeSupported = false;
+let lastBarcodeValue = '';
+let lastBarcodeTime = 0;
+
+function initZXing(){
+  if(zxingReader || typeof ZXing === 'undefined') return;
+  try{
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.CODE_93,
+      ZXing.BarcodeFormat.CODABAR,
+      ZXing.BarcodeFormat.ITF,
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.QR_CODE,
+      ZXing.BarcodeFormat.DATA_MATRIX
+    ]);
+    zxingReader = new ZXing.BrowserMultiFormatReader(hints);
+    barcodeSupported = true;
+    barcodeSupportTag.textContent = 'BARCODE + OCR';
+  }catch(e){
+    barcodeSupportTag.textContent = 'OCR ONLY';
+  }
+}
+initZXing();
+if(!barcodeSupported) barcodeSupportTag.textContent = 'OCR ONLY';
+
 
 // Clock
 function tickClock(){
@@ -439,6 +569,7 @@ startCamBtn.addEventListener('click', async ()=>{
     startCamBtn.textContent = 'Stop Camera';
     captureBtn.disabled = false;
     initOCR();
+    startBarcodeLoop();
   }catch(err){
     camDot.classList.add('err');
     showToast('Camera access denied or unavailable', true);
@@ -450,14 +581,75 @@ function stopCamera(){
     stream.getTracks().forEach(t=>t.stop());
     stream = null;
   }
+  stopBarcodeLoop();
   video.style.display = 'none';
   camPlaceholder.style.display = 'flex';
   scanFrame.style.display = 'none';
+  scanFrame.classList.remove('hit');
   scanline.classList.remove('on');
   camDot.classList.remove('live');
   startCamBtn.textContent = 'Start Camera';
   captureBtn.disabled = true;
 }
+
+// Live barcode scanning — runs continuously while the camera is on, so an
+// MRN barcode is caught the moment it's in frame, no button press needed.
+// Bound directly to the existing <video> element/stream (ZXing doesn't open
+// its own camera here — we're already running one for the OCR flow).
+function startBarcodeLoop(){
+  if(!barcodeSupported || zxingScanning) return;
+  zxingScanning = true;
+  zxingReader.decodeFromVideoElement(video, (result) => {
+    if(!result) return; // fires continuously with no result when nothing's in frame
+    const raw = result.getText();
+    const formatName = ZXing.BarcodeFormat[result.getBarcodeFormat()];
+    const now = Date.now();
+    if(raw === lastBarcodeValue && now - lastBarcodeTime < 4000) return;
+    lastBarcodeValue = raw;
+    lastBarcodeTime = now;
+    handleBarcodeCaptured(raw, formatName);
+  }).catch(()=>{ /* stream ended / reset — expected on stop */ });
+}
+
+function stopBarcodeLoop(){
+  if(zxingReader && zxingScanning){
+    try{ zxingReader.reset(); }catch(e){}
+  }
+  zxingScanning = false;
+}
+
+function handleBarcodeCaptured(raw, format){
+  const cleaned = raw.trim().toUpperCase();
+  const isValidMRN = MRN_PATTERN.test(cleaned);
+
+  mrnValue.textContent = raw.trim();
+  mrnFormatBadge.textContent = format.replace(/_/g,' ').toUpperCase();
+  mrnValidity.innerHTML = isValidMRN
+    ? `<b style="color:var(--cyan)">Matches MRN format</b> · 18-char customs reference`
+    : `Captured — format doesn't match standard 18-char MRN, check by eye`;
+  mrnPanel.style.display = 'block';
+  mrnPanel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+  scanFrame.classList.add('hit');
+  setTimeout(()=> scanFrame.classList.remove('hit'), 500);
+
+  if(navigator.vibrate) navigator.vibrate(70);
+  showToast('Barcode captured');
+}
+
+mrnCopyBtn.addEventListener('click', async ()=>{
+  try{
+    await navigator.clipboard.writeText(mrnValue.textContent);
+    showToast('MRN copied: ' + mrnValue.textContent);
+  }catch(e){
+    showToast('Copy failed — select manually', true);
+  }
+});
+
+mrnDismissBtn.addEventListener('click', ()=>{
+  mrnPanel.style.display = 'none';
+  lastBarcodeValue = ''; // allow the same code to be re-scanned immediately
+});
 
 async function initOCR(){
   if(ocrWorker) return;
@@ -547,6 +739,53 @@ installBtn.addEventListener('click', async () => {
 window.addEventListener('appinstalled', () => {
   installBtn.style.display = 'none';
   showToast('ShowPass installed');
+});
+
+// iOS install guidance — Safari never shows an automatic install prompt,
+// so this is surfaced explicitly. Only shown on iOS, only when not already
+// installed, and only until dismissed.
+const iosInstallHint = document.getElementById('iosInstallHint');
+const iosHintBody = document.getElementById('iosHintBody');
+const iosHintDismiss = document.getElementById('iosHintDismiss');
+
+function isIOSDevice(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS reports as Mac
+}
+function isStandaloneDisplay(){
+  return (window.navigator.standalone === true) ||
+    window.matchMedia('(display-mode: standalone)').matches;
+}
+function isIOSSafariBrowser(){
+  const ua = navigator.userAgent;
+  return /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+}
+
+(function maybeShowIOSHint(){
+  if(!isIOSDevice() || isStandaloneDisplay()) return;
+  if(localStorage.getItem('showpass-ios-hint-dismissed') === '1') return;
+
+  if(isIOSSafariBrowser()){
+    iosHintBody.innerHTML = `
+      <ol class="ios-steps">
+        <li><span class="num">1</span><span>Tap the <b>Share</b> icon in Safari's toolbar (square with an arrow)</span></li>
+        <li><span class="num">2</span><span>Scroll down and tap <b>"Add to Home Screen"</b></span></li>
+        <li><span class="num">3</span><span>Tap <b>Add</b> — ShowPass will appear on your home screen</span></li>
+      </ol>`;
+  } else {
+    iosHintBody.innerHTML = `
+      <p>This browser can't install apps on iPhone — it needs to be Safari.</p>
+      <ol class="ios-steps">
+        <li><span class="num">1</span><span>Open this page in <b>Safari</b> instead</span></li>
+        <li><span class="num">2</span><span>Tap the <b>Share</b> icon, then <b>"Add to Home Screen"</b></span></li>
+      </ol>`;
+  }
+  iosInstallHint.style.display = 'block';
+})();
+
+iosHintDismiss.addEventListener('click', ()=>{
+  iosInstallHint.style.display = 'none';
+  localStorage.setItem('showpass-ios-hint-dismissed', '1');
 });
 
 // init
