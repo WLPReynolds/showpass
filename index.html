@@ -594,13 +594,13 @@ function stopCamera(){
 
 // Live barcode scanning — runs continuously while the camera is on, so an
 // MRN barcode is caught the moment it's in frame, no button press needed.
-// Bound directly to the existing <video> element/stream (ZXing doesn't open
-// its own camera here — we're already running one for the OCR flow).
+// decodeFromStream keeps decoding frame after frame from the existing
+// getUserMedia stream until reset() is called.
 function startBarcodeLoop(){
-  if(!barcodeSupported || zxingScanning) return;
+  if(!barcodeSupported || zxingScanning || !stream) return;
   zxingScanning = true;
-  zxingReader.decodeFromVideoElement(video, (result) => {
-    if(!result) return; // fires continuously with no result when nothing's in frame
+  zxingReader.decodeFromStream(stream, video, (result, err) => {
+    if(!result) return; // fires repeatedly with no result when nothing's in frame — expected
     const raw = result.getText();
     const formatName = ZXing.BarcodeFormat[result.getBarcodeFormat()];
     const now = Date.now();

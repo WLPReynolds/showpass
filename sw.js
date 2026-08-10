@@ -1,4 +1,4 @@
-const CACHE_NAME = 'showpass-v6';
+const CACHE_NAME = 'showpass-v7';
 
 // App shell — cached on install so the app opens instantly and works offline.
 const APP_SHELL = [
@@ -13,7 +13,7 @@ const APP_SHELL = [
 // Tesseract.js core + worker + wasm are fetched from cdnjs at runtime.
 // We cache them the first time they're used so OCR keeps working offline
 // after the initial camera scan has run once with a connection.
-const RUNTIME_CACHE = 'showpass-runtime-v6';
+const RUNTIME_CACHE = 'showpass-runtime-v7';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
